@@ -100,6 +100,10 @@ public: //methods
             mag_output.magnetic_field_body,
             baro_output.pressure * 0.01f /*Pa to Millibar */, baro_output.altitude);
 
+        sendAttitudeQuaternion(
+            imu_output.orientation, 
+            imu_output.angular_velocity);
+
 
         const auto * distance = getDistance();
         if (distance) {
@@ -1125,6 +1129,29 @@ private: //methods
         last_distance_message_ = distance_sensor;
     }
 
+    void sendAttitudeQuaternion(const Quaternionr& orientation, const Vector3r& gyro) {
+        if (!is_simulation_mode_)
+            throw std::logic_error("Attempt to send simulated distance sensor messages while not in simulation mode");
+
+        mavlinkcom::MavLinkAttitudeQuaternion attitude;
+        attitude.time_boot_ms = static_cast<uint32_t>(Utils::getTimeSinceEpochNanos() / 1000000.0);
+
+        attitude.q1 = orientation.w();
+        attitude.q2 = orientation.x();
+        attitude.q3 = orientation.y();
+        attitude.q4 = orientation.z();
+        attitude.rollspeed = gyro.x();
+        attitude.pitchspeed = gyro.y();
+        attitude.yawspeed = gyro.z();
+
+        if (hil_node_ != nullptr) {
+            hil_node_->sendMessage(attitude);
+        }
+
+        std::lock_guard<std::mutex> guard(last_message_mutex_);
+        last_attitude_quaternion_message_ = attitude;
+    }
+
     void sendHILGps(const GeoPoint& geo_point, const Vector3r& velocity, float velocity_xy, float cog,
         float eph, float epv, int fix_type, unsigned int satellites_visible)
     {
@@ -1218,6 +1245,7 @@ private: //variables
 
     mavlinkcom::MavLinkHilSensor last_sensor_message_;
     mavlinkcom::MavLinkDistanceSensor last_distance_message_;
+    mavlinkcom::MavLinkAttitudeQuaternion last_attitude_quaternion_message_;
     mavlinkcom::MavLinkHilGps last_gps_message_;
 
     std::mutex mocap_pose_mutex_, heartbeat_mutex_, set_mode_mutex_, status_text_mutex_, last_message_mutex_;
