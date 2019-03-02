@@ -27,7 +27,7 @@ void MultirotorPawnSimApi::initialize()
     //setup physics vehicle
     phys_vehicle_ = std::unique_ptr<MultiRotor>(new MultiRotor(vehicle_params_.get(), vehicle_api_.get(),
         getKinematics(), getEnvironment()));
-    rotor_count_ = phys_vehicle_->wrenchVertexCount();
+    rotor_count_ = phys_vehicle_->getRotorCount();
     rotor_info_.assign(rotor_count_, RotorInfo());
 
     vehicle_api_->setSimulatedGroundTruth(getGroundTruthKinematics(), getGroundTruthEnvironment());

@@ -7,6 +7,7 @@
 #include "common/Common.hpp"
 #include "common/CommonStructs.hpp"
 #include "Rotor.hpp"
+#include "ExternalWrench.hpp"
 #include "api/VehicleApiBase.hpp"
 #include "api/VehicleSimApiBase.hpp"
 #include "MultiRotorParams.hpp"
@@ -77,6 +78,9 @@ public:
             rotors_.at(rotor_index).setControlSignal(
                 vehicle_api_->getActuation(rotor_index));
         }
+
+        // update external force and torque
+        vehicle_api_->getExternalWrench(external_wrench_.output);
     }
 
     //sensor getter
@@ -88,15 +92,23 @@ public:
     //physics body interface
     virtual uint wrenchVertexCount() const  override
     {
-        return params_->getParams().rotor_count;
+        return getRotorCount() + 1;
     }
     virtual PhysicsBodyVertex& getWrenchVertex(uint index)  override
     {
-        return rotors_.at(index);
+        if (index == 0) {
+            return external_wrench_;
+        }
+
+        return rotors_.at(index-1);
     }
     virtual const PhysicsBodyVertex& getWrenchVertex(uint index) const override
     {
-        return rotors_.at(index);
+        if (index == 0) {
+            return external_wrench_;
+        }
+
+        return rotors_.at(index-1);
     }
 
     virtual uint dragVertexCount() const override
@@ -126,6 +138,11 @@ public:
         return rotors_.at(rotor_index).getOutput();
     }
 
+    uint getRotorCount() const
+    {
+        return params_->getParams().rotor_count;
+    }
+
     virtual ~MultiRotor() = default;
 
 private: //methods
@@ -134,6 +151,8 @@ private: //methods
         PhysicsBody::initialize(params_->getParams().mass, params_->getParams().inertia, kinematics, environment);
 
         createRotors(*params_, rotors_, environment);
+        initExternalWrench(external_wrench_);
+
         createDragVertices();
 
         initSensors(*params_, getKinematics(), getEnvironment());
@@ -147,6 +166,10 @@ private: //methods
             const MultiRotorParams::RotorPose& rotor_pose = params.getParams().rotor_poses.at(rotor_index);
             rotors.emplace_back(rotor_pose.position, rotor_pose.normal, rotor_pose.direction, params.getParams().rotor_params, environment, rotor_index);
         }
+    }
+
+    static void initExternalWrench(ExternalWrench& wrench) {
+        wrench.initialize(Vector3r(0, 0, 0), Vector3r(0, 0, -1));
     }
 
     void reportSensors(MultiRotorParams& params, StateReporter& reporter)
@@ -206,6 +229,7 @@ private: //fields
 
     //let us be the owner of rotors object
     vector<Rotor> rotors_;
+    ExternalWrench external_wrench_;
     vector<PhysicsBodyVertex> drag_vertices_;
 
     std::unique_ptr<Environment> environment_;

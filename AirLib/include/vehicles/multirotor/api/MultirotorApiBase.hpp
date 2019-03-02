@@ -69,6 +69,11 @@ public: //optional overrides
         unused(environment);
     }
 
+    virtual void getExternalWrench(Wrench& wrench) const override {
+        wrench.force = Vector3r {0, 0, 0};
+        wrench.torque = Vector3r {0, 0, 0};
+    }
+
     virtual void reset() override;
 
 

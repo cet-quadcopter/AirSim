@@ -70,6 +70,12 @@ public:
     {
         throw VehicleCommandNotImplementedException("getActuatorCount API is not supported for this vehicle");
     }
+    
+    virtual void getExternalWrench(Wrench& wrench) const
+    {
+        unused(wrench);
+        throw VehicleCommandNotImplementedException("getExternalWrench API is not supported for this vehicle");
+    }
 
     virtual void getStatusMessages(std::vector<std::string>& messages)
     {
