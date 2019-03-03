@@ -238,6 +238,13 @@ public: //methods
         return RotorControlsCount;
     }
 
+    virtual void getExternalWrench(Wrench& wrench) const override {
+        std::lock_guard<std::mutex> guard(external_wrench_mutex_);
+
+        wrench.force = Vector3r(external_wrench_[0], external_wrench_[1], external_wrench_[2]);
+        wrench.torque = Vector3r(external_wrench_[3], external_wrench_[4], external_wrench_[5]);;
+    }
+
     virtual bool armDisarm(bool arm) override
     {
         SingleCall lock(this);
@@ -743,6 +750,8 @@ private: //methods
             is_armed_ = false;
             is_controls_0_1_ = true;
             Utils::setValue(rotor_controls_, 0.0f);
+            Utils::setValue(external_wrench_, 0.0f);
+
             //TODO: main_node_->setMessageInterval(...);
             connection_->subscribe([=](std::shared_ptr<mavlinkcom::MavLinkConnection> connection, const mavlinkcom::MavLinkMessage& msg) {
                 unused(connection);
@@ -1070,6 +1079,18 @@ private: //methods
             }
             normalizeRotorControls();
         }
+        else if (msg.msgid == ExternalWrenchMessage.msgid) {
+            std::lock_guard<std::mutex> guard_wrench(external_wrench_mutex_);
+
+            ExternalWrenchMessage.decode(msg);
+
+            external_wrench_[0] = ExternalWrenchMessage.x;
+            external_wrench_[1] = ExternalWrenchMessage.y;
+            external_wrench_[2] = ExternalWrenchMessage.z;
+            external_wrench_[3] = ExternalWrenchMessage.vx;
+            external_wrench_[4] = ExternalWrenchMessage.vy;
+            external_wrench_[5] = ExternalWrenchMessage.vz;
+        }
         //else ignore message
     }
 
@@ -1200,6 +1221,7 @@ private: //methods
         is_api_control_enabled_ = false;
         thrust_controller_ = PidController();
         Utils::setValue(rotor_controls_, 0.0f);
+        Utils::setValue(external_wrench_, 0.0f);
         was_reset_ = false;
         mocap_pose_ = Pose::nanPose();
     }
@@ -1212,9 +1234,10 @@ protected: //variables
 	static const int RotorControlsCount = 8;
 
 	const SensorCollection* sensors_;
-	mutable std::mutex hil_controls_mutex_;
+	mutable std::mutex hil_controls_mutex_, external_wrench_mutex_;
 	AirSimSettings::MavLinkConnectionInfo connection_info_;
 	float rotor_controls_[RotorControlsCount];
+    float external_wrench_[6];
 	bool is_simulation_mode_;
 
 
@@ -1242,6 +1265,7 @@ private: //variables
     mavlinkcom::MavLinkHilControls HilControlsMessage;
     mavlinkcom::MavLinkHilActuatorControls HilActuatorControlsMessage;
     mavlinkcom::MavLinkCommandLong CommandLongMessage;
+    mavlinkcom::MavLinkLocalPositionNed ExternalWrenchMessage; // TODO: Use custom message
 
     mavlinkcom::MavLinkHilSensor last_sensor_message_;
     mavlinkcom::MavLinkDistanceSensor last_distance_message_;
